@@ -1,0 +1,45 @@
+name: Notify note posts to Slack
+
+on:
+  schedule:
+    # Temporary interval. Adjust later.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: notify-note-posts
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Notify Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NOTE_RSS_URL: ${{ vars.NOTE_RSS_URL || 'https://note.com/clinial/rss' }}
+          NOTIFY_LOOKBACK_HOURS: ${{ vars.NOTIFY_LOOKBACK_HOURS || '24' }}
+          MAX_NOTIFY_ITEMS: ${{ vars.MAX_NOTIFY_ITEMS || '5' }}
+        run: python3 scripts/notify_note_to_slack.py
+
+      - name: Commit notification state
+        run: |
+          if git diff --quiet -- state/notified.json; then
+            echo "No state changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/notified.json
+          git commit -m "Update notified note posts"
+          git push
