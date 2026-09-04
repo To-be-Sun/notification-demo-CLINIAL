@@ -2,8 +2,9 @@ name: Notify note posts to Slack
 
 on:
   schedule:
-    # Temporary interval. Adjust later.
-    - cron: "*/30 * * * *"
+    # GitHub cron cannot read repository variables directly.
+    # Keep this frequent and control the actual interval with RUN_INTERVAL_MINUTES.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -29,6 +30,7 @@ jobs:
           NOTE_RSS_URL: ${{ vars.NOTE_RSS_URL || 'https://note.com/clinial/rss' }}
           NOTIFY_LOOKBACK_HOURS: ${{ vars.NOTIFY_LOOKBACK_HOURS || '24' }}
           MAX_NOTIFY_ITEMS: ${{ vars.MAX_NOTIFY_ITEMS || '5' }}
+          RUN_INTERVAL_MINUTES: ${{ vars.RUN_INTERVAL_MINUTES || '30' }}
         run: python3 scripts/notify_note_to_slack.py
 
       - name: Commit notification state

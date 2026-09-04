@@ -34,6 +34,18 @@ def parse_datetime(value):
     return parsed.astimezone(dt.timezone.utc)
 
 
+def parse_iso_datetime(value):
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(dt.timezone.utc)
+
+
 def fetch_rss(url):
     request = urllib.request.Request(
         url,
@@ -143,21 +155,34 @@ def main():
     state_file = Path(os.environ.get("STATE_FILE", DEFAULT_STATE_FILE))
     lookback_hours = env_int("NOTIFY_LOOKBACK_HOURS", 24)
     max_items = env_int("MAX_NOTIFY_ITEMS", 5)
+    run_interval_minutes = env_int("RUN_INTERVAL_MINUTES", 30)
     dry_run = os.environ.get("DRY_RUN", "").lower() in {"1", "true", "yes"}
 
     if not webhook_url and not dry_run:
         print("SLACK_WEBHOOK_URL is required", file=sys.stderr)
         return 2
 
+    now = dt.datetime.now(dt.timezone.utc)
+    state = load_state(state_file)
+    last_checked_at = parse_iso_datetime(state.get("last_checked_at"))
+    if (
+        not dry_run
+        and run_interval_minutes > 0
+        and last_checked_at
+        and now - last_checked_at < dt.timedelta(minutes=run_interval_minutes)
+    ):
+        next_run_at = last_checked_at + dt.timedelta(minutes=run_interval_minutes)
+        print(f"Skipped. Next check starts at {next_run_at.isoformat()}.")
+        return 0
+
     xml_bytes = fetch_rss(rss_url)
     items = parse_items(xml_bytes)
     items.sort(key=lambda item: item["published_at"] or dt.datetime.min.replace(tzinfo=dt.timezone.utc))
 
-    state = load_state(state_file)
     notified = state.setdefault("notified", [])
     notified_ids = {entry["id"] for entry in notified}
 
-    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=lookback_hours)
+    cutoff = now - dt.timedelta(hours=lookback_hours)
     candidates = []
     for item in items:
         if item["id"] in notified_ids:
@@ -170,6 +195,9 @@ def main():
 
     if not candidates:
         print("No new posts to notify.")
+        state["last_checked_at"] = now.isoformat()
+        if not dry_run:
+            save_state(state_file, state)
         return 0
 
     for item in candidates:
@@ -185,11 +213,12 @@ def main():
                 "id": item["id"],
                 "title": item["title"],
                 "link": item["link"],
-                "notified_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                "notified_at": now.isoformat(),
             }
         )
 
     state["notified"] = notified[-200:]
+    state["last_checked_at"] = now.isoformat()
     if not dry_run:
         save_state(state_file, state)
     return 0
