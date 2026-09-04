@@ -1,3 +1,16 @@
 {
-  "notified": []
+  "notified": [
+    {
+      "id": "https://note.com/clinial/n/n3c2e7751f4a2",
+      "title": "「適応外使用」とはなにか",
+      "link": "https://note.com/clinial/n/n3c2e7751f4a2",
+      "notified_at": "2026-09-04T05:29:51.003805+00:00"
+    },
+    {
+      "id": "https://note.com/clinial/n/ne12e065f0263",
+      "title": "What is “Off-Label Use” in Japan?",
+      "link": "https://note.com/clinial/n/ne12e065f0263",
+      "notified_at": "2026-09-04T05:29:51.235215+00:00"
+    }
+  ]
 }
